@@ -2,6 +2,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Suspense } from "react";
 import { StatusBadge } from "#/components/status-badge";
+import { TaskStatusActions } from "#/components/task-status-actions";
 import {
 	Dialog,
 	DialogContent,
@@ -34,7 +35,8 @@ export function TaskModal({
 			<DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
 				{taskId !== undefined && (
 					<Suspense fallback={<TaskModalSkeleton />}>
-						<TaskDetails taskId={taskId} />
+						{/* key: при переходе к другой задаче состояние формы сбрасывается */}
+						<TaskDetails key={taskId} taskId={taskId} />
 					</Suspense>
 				)}
 			</DialogContent>
@@ -104,7 +106,7 @@ function TaskDetails({ taskId }: { taskId: number }) {
 				</div>
 			)}
 
-			{/* Кнопки действий (смена статуса, редактирование) — этап мутаций */}
+			<TaskStatusActions task={task} />
 
 			<section className="flex flex-col gap-2">
 				<h3 className="text-sm font-medium">История</h3>

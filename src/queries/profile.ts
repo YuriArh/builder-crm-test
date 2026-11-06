@@ -18,3 +18,17 @@ export const meQueryOptions = (userId: string) =>
 	});
 
 export type Profile = Pick<Tables<"profiles">, "id" | "full_name" | "role">;
+
+/** Исполнители для выбора в форме задачи. Полный список видит только постановщик (RLS). */
+export const executorsQueryOptions = () =>
+	queryOptions({
+		queryKey: queryKeys.executors,
+		queryFn: async () =>
+			unwrap(
+				await supabase
+					.from("profiles")
+					.select("id, full_name")
+					.eq("role", "executor")
+					.order("full_name"),
+			),
+	});

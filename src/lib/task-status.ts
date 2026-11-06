@@ -41,3 +41,42 @@ export const ROLE_LABEL: Record<AppRole, string> = {
 	manager: "Постановщик",
 	executor: "Исполнитель",
 };
+
+export type StatusAction = {
+	to: TaskStatus;
+	label: string;
+	/** Комментарий обязателен (возврат на доработку) */
+	requiresComment?: boolean;
+	variant?: "default" | "destructive";
+};
+
+/**
+ * Копия таблицы переходов из change_task_status — только чтобы показать нужные кнопки.
+ * Решение принимает база: кнопка, нажатая по устаревшим данным, получит отказ.
+ */
+const EXECUTOR_ACTIONS: Partial<Record<TaskStatus, StatusAction[]>> = {
+	new: [{ to: "in_progress", label: "Взять в работу" }],
+	in_progress: [{ to: "review", label: "Отправить на проверку" }],
+	rework: [{ to: "in_progress", label: "Взять в работу" }],
+};
+
+const MANAGER_ACTIONS: Partial<Record<TaskStatus, StatusAction[]>> = {
+	review: [
+		{ to: "accepted", label: "Принять" },
+		{
+			to: "rework",
+			label: "Вернуть на доработку",
+			requiresComment: true,
+			variant: "destructive",
+		},
+	],
+};
+
+export function getStatusActions(
+	role: AppRole,
+	isAssignee: boolean,
+	status: TaskStatus,
+): StatusAction[] {
+	if (role === "manager") return MANAGER_ACTIONS[status] ?? [];
+	return isAssignee ? (EXECUTOR_ACTIONS[status] ?? []) : [];
+}

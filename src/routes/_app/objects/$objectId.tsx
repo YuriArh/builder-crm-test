@@ -1,11 +1,17 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { noop, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { CreateTaskDialog } from "#/components/create-task-dialog";
+import { DeleteObjectDialog } from "#/components/delete-object-dialog";
 import { NotFound } from "#/components/not-found";
 import { StatusFilter } from "#/components/status-filter";
 import { TaskList, TaskRowContent } from "#/components/task-list";
 import { TaskModal } from "#/components/task-modal";
+import { Button } from "#/components/ui/button";
 import { taskListSearchSchema } from "#/lib/task-search";
-import { objectQueryOptions } from "#/queries/objects";
+import { objectQueryOptions, objectsQueryOptions } from "#/queries/objects";
+import { executorsQueryOptions } from "#/queries/profile";
 import {
 	ensureTaskWithHistory,
 	objectTasksQueryOptions,
@@ -19,8 +25,18 @@ export const Route = createFileRoute("/_app/objects/$objectId")({
 	validateSearch: taskListSearchSchema,
 	// Loader зависит только от ?task; смена фильтра ?status не перезапускает загрузку
 	loaderDeps: ({ search }) => ({ task: search.task }),
-	loader: async ({ context: { queryClient }, params: { objectId }, deps }) => {
+	loader: async ({
+		context: { queryClient, profile },
+		params: { objectId },
+		deps,
+	}) => {
 		if (!Number.isSafeInteger(objectId) || objectId <= 0) throw notFound();
+
+		// Постановщику заранее и не блокируя переход грузим списки для формы «Новая задача»
+		if (profile.role === "manager") {
+			void queryClient.query(executorsQueryOptions()).catch(noop);
+			void queryClient.query(objectsQueryOptions()).catch(noop);
+		}
 
 		const [object] = await Promise.all([
 			queryClient.query({
@@ -49,6 +65,10 @@ function ObjectPage() {
 	const navigate = Route.useNavigate();
 	const { data: object } = useSuspenseQuery(objectQueryOptions(objectId));
 	const { data: tasks } = useSuspenseQuery(objectTasksQueryOptions(objectId));
+	const { profile } = Route.useRouteContext();
+	const isManager = profile.role === "manager";
+	const [createOpen, setCreateOpen] = useState(false);
+	const [deleteOpen, setDeleteOpen] = useState(false);
 
 	if (!object) return <NotFound>Объект не найден</NotFound>;
 
@@ -65,8 +85,29 @@ function ObjectPage() {
 				>
 					← Все объекты
 				</Link>
-				<h1 className="mt-1 text-lg font-medium">{object.name}</h1>
-				<p className="text-sm text-muted-foreground">{object.address}</p>
+				<div className="mt-1 flex items-start justify-between gap-4">
+					<div>
+						<h1 className="text-lg font-medium">{object.name}</h1>
+						<p className="text-sm text-muted-foreground">{object.address}</p>
+					</div>
+					{isManager && (
+						<div className="flex shrink-0 gap-2">
+							<Button onClick={() => setCreateOpen(true)}>
+								<Plus data-icon="inline-start" />
+								Новая задача
+							</Button>
+							<Button
+								variant="destructive"
+								size="icon"
+								aria-label="Удалить объект"
+								title="Удалить объект"
+								onClick={() => setDeleteOpen(true)}
+							>
+								<Trash2 />
+							</Button>
+						</div>
+					)}
+				</div>
 			</div>
 
 			<StatusFilter from={Route.fullPath} value={status} />
@@ -100,6 +141,22 @@ function ObjectPage() {
 					navigate({ search: (prev) => ({ ...prev, task: undefined }) })
 				}
 			/>
+
+			{isManager && (
+				<>
+					<CreateTaskDialog
+						objectId={objectId}
+						open={createOpen}
+						onOpenChange={setCreateOpen}
+					/>
+					<DeleteObjectDialog
+						object={object}
+						taskCount={tasks.length}
+						open={deleteOpen}
+						onOpenChange={setDeleteOpen}
+					/>
+				</>
+			)}
 		</div>
 	);
 }

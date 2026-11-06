@@ -1,6 +1,10 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Plus } from "lucide-react";
+import { useState } from "react";
+import { CreateObjectDialog } from "#/components/create-object-dialog";
 import { EmptyState } from "#/components/empty-state";
+import { Button } from "#/components/ui/button";
 import { objectsQueryOptions } from "#/queries/objects";
 
 export const Route = createFileRoute("/_app/objects/")({
@@ -16,16 +20,24 @@ export const Route = createFileRoute("/_app/objects/")({
 function ObjectsPage() {
 	const { profile } = Route.useRouteContext();
 	const { data: objects } = useSuspenseQuery(objectsQueryOptions());
+	const [createOpen, setCreateOpen] = useState(false);
+	const isManager = profile.role === "manager";
 
 	return (
 		<div className="flex flex-col gap-4">
-			<h1 className="text-lg font-medium">Объекты</h1>
+			<div className="flex items-center justify-between gap-4">
+				<h1 className="text-lg font-medium">Объекты</h1>
+				{isManager && (
+					<Button onClick={() => setCreateOpen(true)}>
+						<Plus data-icon="inline-start" />
+						Новый объект
+					</Button>
+				)}
+			</div>
 
 			{objects.length === 0 ? (
 				<EmptyState>
-					{profile.role === "manager"
-						? "Объектов пока нет"
-						: "Вам пока не назначены задачи"}
+					{isManager ? "Объектов пока нет" : "Вам пока не назначены задачи"}
 				</EmptyState>
 			) : (
 				<ul className="flex flex-col divide-y rounded-lg border">
@@ -51,6 +63,10 @@ function ObjectsPage() {
 						</li>
 					))}
 				</ul>
+			)}
+
+			{isManager && (
+				<CreateObjectDialog open={createOpen} onOpenChange={setCreateOpen} />
 			)}
 		</div>
 	);

@@ -1,6 +1,7 @@
 /** Все ключи запросов в одном месте — для инвалидации на этапе мутаций. */
 export const queryKeys = {
 	me: (userId: string) => ["me", userId] as const,
+	executors: ["executors"] as const,
 	objects: {
 		all: ["objects"] as const,
 		detail: (id: number) => ["objects", id] as const,
