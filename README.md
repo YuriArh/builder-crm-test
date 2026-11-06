@@ -1,194 +1,161 @@
-Welcome to your new TanStack Start app!
+# Мини-CRM «Объекты и задачи»
 
-# Getting Started
+Учёт задач на строительных объектах. Постановщик создаёт объекты и задачи, назначает исполнителя и принимает работу. Исполнитель видит только свои задачи и двигает их по статусам. Каждая смена статуса записывается в историю.
 
-To run this application:
+**Приложение:** <ссылка на Vercel>
+
+## Доступы для проверки
+
+| Роль        | Email                 | Пароль     |
+| ----------- | --------------------- | ---------- |
+| Постановщик | `manager@example.com` | `testtest` |
+| Исполнитель | `worker1@example.com` | `testtest` |
+| Исполнитель | `worker2@example.com` | `testtest` |
+
+Пароли созданы только для проверки задания. Регистрация в приложении отключена, пользователей заводит администратор в Supabase.
+
+## Документы
+
+- [docs/OVERVIEW.md](docs/OVERVIEW.md) — как устроена система и как защищены данные, простым языком.
+- [docs/DECISIONS.md](docs/DECISIONS.md) — решения и допущения там, где ТЗ не даёт однозначного ответа; вопросы для созвона.
+- [docs/SPEC.md](docs/SPEC.md) — спецификация экранов и поведения.
+
+## Что умеет
+
+**Статусы задачи:**
+
+```
+Новая → В работе → На проверке → Принята
+                         ↓
+                    На доработке → В работе
+```
+
+| Действие                                                               | Постановщик | Исполнитель                                |
+| ---------------------------------------------------------------------- | ----------- | ------------------------------------------ |
+| Видеть объекты и задачи                                                | все         | только свои задачи и объекты, где они есть |
+| Создавать объекты и задачи, удалять объекты                            | да          | нет                                        |
+| Редактировать задачу (название, описание, объект), пока она не принята | да          | нет                                        |
+| «Взять в работу», «Отправить на проверку»                              | нет         | да, в своих задачах                        |
+| «Принять», «Вернуть на доработку» (с обязательным комментарием)        | да          | нет                                        |
+| Смотреть историю статусов                                              | да          | да, по своим задачам                       |
+
+Экраны:
+
+- вход;
+- список объектов;
+- карточка объекта со списком задач и фильтром по статусу;
+- «Мои задачи» для исполнителя;
+- модалка задачи с историей. У модалки свой адрес (`?task=<id>`), им можно поделиться.
+
+## Стек
+
+- **Фронтенд:** React 19, TypeScript, Vite, TanStack Router и TanStack Query, Tailwind CSS v4, shadcn/ui (Base UI), Zod, Biome.
+- **Бэкенд:** Supabase (Postgres, Auth). Своего сервера нет: фронтенд обращается к Supabase напрямую с publishable-ключом, а все правила доступа проверяет база.
+- **Хостинг:** Vercel.
+
+## Как устроена защита
+
+Интерфейс только скрывает недоступные кнопки. Запрос в обход приложения, напрямую к REST API Supabase, проходит те же проверки в базе:
+
+1. **Права на таблицы и колонки** (`GRANT`). У `anon` нет доступа ни к чему. `authenticated` читает таблицы, а пишет только в разрешённые колонки:
+   - в `tasks.status`, `tasks.assignee_id` (после создания), `tasks.author_id` писать нельзя;
+   - в `profiles` и `task_status_history` писать нельзя вовсе.
+2. **RLS на всех таблицах.** Исполнитель видит только свои задачи, их историю и объекты, где у него есть задачи. Создавать, редактировать и удалять может только постановщик. Принятую задачу редактировать нельзя. Роль проверяется функциями в схеме `private`, закрытой от API.
+3. **Смена статуса только через функцию `change_task_status`.** Функция:
+   - проверяет, кто вызывает и чья это задача;
+   - проверяет переход по таблице из ТЗ и обязательный комментарий при возврате на доработку;
+   - блокирует строку задачи, чтобы два одновременных перехода не прошли оба;
+   - пишет запись в историю в той же транзакции.
+
+   Стартовую запись истории добавляет триггер при создании задачи.
+
+4. **История неизменяема.** У клиента нет прав INSERT, UPDATE и DELETE на `task_status_history`. Записи удаляются только каскадом вместе с задачей.
+5. **Регистрация отключена**, а ключ `service_role` не используется ни в приложении, ни в репозитории.
+
+Код защиты: [`supabase/migrations/20261106120100_security.sql`](supabase/migrations/20261106120100_security.sql) и следующие миграции.
+
+## Запуск с нуля
+
+Нужны Node.js 20+ и аккаунт Supabase. Supabase CLI запускается через `npx`.
+
+### 1. База данных
+
+1. Создайте проект в [Supabase](https://supabase.com/dashboard).
+2. Отключите регистрацию: Authentication → Sign In / Providers → **Allow new users to sign up** выключить.
+3. Примените миграции:
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref <project-ref>
+   npx supabase db push
+   ```
+4. Создайте пользователей: Authentication → Users → **Add user** с включённым **Auto Confirm User**. Нужны `manager@example.com`, `worker1@example.com` и `worker2@example.com`.
+5. Загрузите тестовые данные: выполните [`supabase/seed.sql`](supabase/seed.sql) в SQL Editor. Скрипт создаст профили с ролями, 3 объекта и 7 задач в разных статусах с историей. Повторный запуск продублирует данные.
+
+### 2. Приложение
+
+Создайте `.env.local`. Значения возьмите в Dashboard → Project Settings → API Keys:
+
+```bash
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+Установите зависимости и запустите:
 
 ```bash
 npm install
-npm run dev
+npm run dev     # http://localhost:3000
 ```
 
-# Building For Production
-
-To build this application for production:
+Проверки и сборка:
 
 ```bash
+npx tsc --noEmit
+npm run check
 npm run build
 ```
 
-## Styling
+### 3. Деплой на Vercel
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+Импортируйте репозиторий в Vercel и задайте те же две переменные окружения. [`vercel.json`](vercel.json) отдаёт `index.html` на любой адрес, поэтому прямые ссылки вроде `/objects/3?task=7` работают.
 
-### Removing Tailwind CSS
+## Проверка защиты
 
-If you prefer not to use Tailwind CSS:
+[`supabase/tests/security_checks.sql`](supabase/tests/security_checks.sql) выполняет 19 запросов от имени анонима, исполнителя, постановщика и пользователя без профиля:
 
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
+- чтение чужих данных;
+- прямой UPDATE статуса;
+- запрещённые переходы;
+- подделка и удаление истории;
+- повышение своей роли;
+- создание задачи исполнителем;
+- возврат на доработку без комментария;
+- правка принятой задачи.
 
-## Linting & Formatting
+Изменения каждой проверки откатываются, данные остаются прежними.
 
-This project uses [Biome](https://biomejs.dev/) for linting and formatting. The following scripts are available:
+Запуск: после `seed.sql` выполните файл в SQL Editor. Во всех строках результата должно быть `passed = true`.
 
+## Структура
 
-```bash
-npm run lint
-npm run format
-npm run check
+```
+supabase/
+  migrations/      схема, права, RLS, функция смены статуса
+  seed.sql         тестовые данные
+  tests/           проверка защиты
+src/
+  routes/          экраны (файловый роутинг TanStack Router)
+  queries/         запросы и мутации (TanStack Query)
+  components/      модалки, формы, списки; ui/ — компоненты shadcn
+  lib/             статусы, форматирование, валидация search-параметров
+docs/              объяснение, решения, спецификация
 ```
 
+## Что не сделано
 
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+- Удаление задачи, редактирование объекта (описаны в спецификации).
+- Переназначение исполнителя: ТЗ его не требует, варианты описаны в [DECISIONS.md](docs/DECISIONS.md#обсудить-на-созвоне).
+- Обновление данных в реальном времени: изменения других пользователей видны после повторного запроса, например при возврате на вкладку.
+- Поиск и пагинация списков.
+- Управление пользователями и ролями из интерфейса: только через Supabase Dashboard.
+- Автотесты фронтенда.

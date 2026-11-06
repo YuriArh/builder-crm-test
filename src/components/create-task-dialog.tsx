@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { type FormEvent, Suspense, useState } from "react";
 import { FormError, FormField } from "#/components/form-field";
+import { ObjectSelect } from "#/components/object-select";
 import { Button } from "#/components/ui/button";
 import {
 	Dialog,
@@ -19,7 +20,6 @@ import {
 } from "#/components/ui/select";
 import { Skeleton } from "#/components/ui/skeleton";
 import { Textarea } from "#/components/ui/textarea";
-import { objectsQueryOptions } from "#/queries/objects";
 import { executorsQueryOptions } from "#/queries/profile";
 import { useCreateTask } from "#/queries/task-mutations";
 
@@ -60,7 +60,6 @@ function CreateTaskForm({
 	onDone: () => void;
 }) {
 	const { data: executors } = useSuspenseQuery(executorsQueryOptions());
-	const { data: objects } = useSuspenseQuery(objectsQueryOptions());
 	const mutation = useCreateTask();
 
 	const [title, setTitle] = useState("");
@@ -106,28 +105,11 @@ function CreateTaskForm({
 				/>
 			</FormField>
 			<FormField id="task-object" label="Объект">
-				<Select
-					required
+				<ObjectSelect
+					id="task-object"
 					value={objectId}
-					onValueChange={(value) => {
-						if (value !== null) setObjectId(value);
-					}}
-					items={objects.map((object) => ({
-						value: object.id,
-						label: object.name,
-					}))}
-				>
-					<SelectTrigger id="task-object" className="w-full">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent>
-						{objects.map((object) => (
-							<SelectItem key={object.id} value={object.id}>
-								{object.name}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+					onChange={setObjectId}
+				/>
 			</FormField>
 			<FormField id="task-assignee" label="Исполнитель">
 				<Select

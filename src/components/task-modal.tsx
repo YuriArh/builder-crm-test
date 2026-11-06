@@ -1,8 +1,11 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { Suspense } from "react";
+import { Link, useRouteContext } from "@tanstack/react-router";
+import { Pencil } from "lucide-react";
+import { Suspense, useState } from "react";
 import { StatusBadge } from "#/components/status-badge";
+import { TaskEditForm } from "#/components/task-edit-form";
 import { TaskStatusActions } from "#/components/task-status-actions";
+import { Button } from "#/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -36,7 +39,7 @@ export function TaskModal({
 				{taskId !== undefined && (
 					<Suspense fallback={<TaskModalSkeleton />}>
 						{/* key: при переходе к другой задаче состояние формы сбрасывается */}
-						<TaskDetails key={taskId} taskId={taskId} />
+						<TaskDetails key={taskId} taskId={taskId} onClose={onClose} />
 					</Suspense>
 				)}
 			</DialogContent>
@@ -44,9 +47,17 @@ export function TaskModal({
 	);
 }
 
-function TaskDetails({ taskId }: { taskId: number }) {
+function TaskDetails({
+	taskId,
+	onClose,
+}: {
+	taskId: number;
+	onClose: () => void;
+}) {
 	const { data: task } = useSuspenseQuery(taskQueryOptions(taskId));
 	const { data: history } = useSuspenseQuery(taskHistoryQueryOptions(taskId));
+	const { profile } = useRouteContext({ from: "/_app" });
+	const [editing, setEditing] = useState(false);
 
 	if (!task) {
 		return (
@@ -58,6 +69,31 @@ function TaskDetails({ taskId }: { taskId: number }) {
 			</DialogHeader>
 		);
 	}
+
+	if (editing) {
+		return (
+			<div className="flex flex-col gap-5">
+				<DialogHeader className="pr-8">
+					<DialogTitle className="text-base">Редактирование задачи</DialogTitle>
+				</DialogHeader>
+				{/* Список объектов обычно уже в кэше: его заранее грузит loader карточки объекта */}
+				<Suspense fallback={<TaskModalSkeleton />}>
+					<TaskEditForm
+						task={task}
+						onCancel={() => setEditing(false)}
+						onSaved={(movedToObjectId) => {
+							// Задача переехала в другой объект: в текущей карточке её больше нет
+							if (movedToObjectId !== null) onClose();
+							else setEditing(false);
+						}}
+					/>
+				</Suspense>
+			</div>
+		);
+	}
+
+	// Принятую задачу база редактировать не даст — кнопку не показываем
+	const canEdit = profile.role === "manager" && task.status !== "accepted";
 
 	const reworkComment =
 		task.status === "rework"
@@ -103,6 +139,15 @@ function TaskDetails({ taskId }: { taskId: number }) {
 				<div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm dark:border-red-900 dark:bg-red-950/40">
 					<div className="mb-1 font-medium">Что исправить</div>
 					<p className="whitespace-pre-wrap">{reworkComment}</p>
+				</div>
+			)}
+
+			{canEdit && (
+				<div>
+					<Button variant="outline" onClick={() => setEditing(true)}>
+						<Pencil data-icon="inline-start" />
+						Редактировать
+					</Button>
 				</div>
 			)}
 

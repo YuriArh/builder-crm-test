@@ -54,6 +54,46 @@ export function useCreateTask() {
 	});
 }
 
+export type TaskEditInput = {
+	object_id: number;
+	title: string;
+	description: string | null;
+};
+
+/**
+ * Редактирование задачи. База разрешает менять только название, описание и объект
+ * и только пока задача не принята. Если RLS не пропустил строку (задачу успели
+ * принять или удалить), UPDATE не вернёт ни одной строки — это и есть ошибка.
+ */
+export function useUpdateTask(taskId: number) {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (input: TaskEditInput) => {
+			const rows = unwrap(
+				await supabase
+					.from("tasks")
+					.update(input)
+					.eq("id", taskId)
+					.select("id, object_id"),
+			);
+			if (rows.length === 0) {
+				throw new Error(
+					"Задача уже принята или удалена, изменения не сохранены",
+				);
+			}
+			return rows[0];
+		},
+		// И после ошибки перечитываем: модалка покажет актуальный статус задачи
+		onSettled: () =>
+			Promise.all([
+				queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all }),
+				// при переносе в другой объект меняется число задач в списке объектов
+				queryClient.invalidateQueries({ queryKey: queryKeys.objects.all }),
+			]),
+	});
+}
+
 export function statusChangeErrorMessage(error: unknown): string {
 	const pgError = error as Partial<PostgrestError> | null;
 	// 42501 из change_task_status — переход недоступен из текущего статуса
