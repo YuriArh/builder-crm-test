@@ -9,27 +9,153 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppMyTasksRouteImport } from './routes/_app/my-tasks'
+import { Route as AppObjectsIndexRouteImport } from './routes/_app/objects/index'
+import { Route as AppObjectsObjectIdRouteImport } from './routes/_app/objects/$objectId'
 
-export interface FileRoutesByFullPath {}
-export interface FileRoutesByTo {}
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMyTasksRoute = AppMyTasksRouteImport.update({
+  id: '/my-tasks',
+  path: '/my-tasks',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppObjectsIndexRoute = AppObjectsIndexRouteImport.update({
+  id: '/objects/',
+  path: '/objects/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppObjectsObjectIdRoute = AppObjectsObjectIdRouteImport.update({
+  id: '/objects/$objectId',
+  path: '/objects/$objectId',
+  getParentRoute: () => AppRoute,
+} as any)
+
+export interface FileRoutesByFullPath {
+  '/': typeof AppIndexRoute
+  '/login': typeof LoginRoute
+  '/my-tasks': typeof AppMyTasksRoute
+  '/objects/$objectId': typeof AppObjectsObjectIdRoute
+  '/objects/': typeof AppObjectsIndexRoute
+}
+export interface FileRoutesByTo {
+  '/login': typeof LoginRoute
+  '/my-tasks': typeof AppMyTasksRoute
+  '/': typeof AppIndexRoute
+  '/objects/$objectId': typeof AppObjectsObjectIdRoute
+  '/objects': typeof AppObjectsIndexRoute
+}
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/_app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_app/my-tasks': typeof AppMyTasksRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/objects/$objectId': typeof AppObjectsObjectIdRoute
+  '/_app/objects/': typeof AppObjectsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: never
+  fullPaths: '/' | '/login' | '/my-tasks' | '/objects/$objectId' | '/objects/'
   fileRoutesByTo: FileRoutesByTo
-  to: never
-  id: '__root__'
+  to: '/login' | '/my-tasks' | '/' | '/objects/$objectId' | '/objects'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/login'
+    | '/_app/my-tasks'
+    | '/_app/'
+    | '/_app/objects/$objectId'
+    | '/_app/objects/'
   fileRoutesById: FileRoutesById
 }
-export interface RootRouteChildren {}
-
-declare module '@tanstack/react-router' {
-  interface FileRoutesByPath {}
+export interface RootRouteChildren {
+  AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
-const rootRouteChildren: RootRouteChildren = {}
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/my-tasks': {
+      id: '/_app/my-tasks'
+      path: '/my-tasks'
+      fullPath: '/my-tasks'
+      preLoaderRoute: typeof AppMyTasksRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/objects/': {
+      id: '/_app/objects/'
+      path: '/objects'
+      fullPath: '/objects/'
+      preLoaderRoute: typeof AppObjectsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/objects/$objectId': {
+      id: '/_app/objects/$objectId'
+      path: '/objects/$objectId'
+      fullPath: '/objects/$objectId'
+      preLoaderRoute: typeof AppObjectsObjectIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+  }
+}
+
+interface AppRouteChildren {
+  AppMyTasksRoute: typeof AppMyTasksRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppObjectsObjectIdRoute: typeof AppObjectsObjectIdRoute
+  AppObjectsIndexRoute: typeof AppObjectsIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppMyTasksRoute: AppMyTasksRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppObjectsObjectIdRoute: AppObjectsObjectIdRoute,
+  AppObjectsIndexRoute: AppObjectsIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  AppRoute: AppRouteWithChildren,
+  LoginRoute: LoginRoute,
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()

@@ -5,6 +5,8 @@ import { ReactQueryDevtoolsPanel } from "@tanstack/react-query-devtools";
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 
+import { NotFound } from "#/components/not-found";
+
 import "../styles.css";
 
 export interface RouterContext {
@@ -13,6 +15,7 @@ export interface RouterContext {
 
 export const Route = createRootRouteWithContext<RouterContext>()({
 	component: RootComponent,
+	notFoundComponent: () => <NotFound />,
 });
 
 function RootComponent() {
